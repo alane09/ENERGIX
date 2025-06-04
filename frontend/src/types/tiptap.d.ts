@@ -1,0 +1,10 @@
+declare module '@tiptap/react';
+declare module '@tiptap/starter-kit';
+declare module '@tiptap/extension-underline';
+declare module '@tiptap/extension-placeholder';
+declare module '@tiptap/extension-image';
+declare module '@tiptap/extension-table';
+declare module '@tiptap/extension-table-row';
+declare module '@tiptap/extension-table-cell';
+declare module '@tiptap/extension-table-header';
+declare module '@tiptap/pm';

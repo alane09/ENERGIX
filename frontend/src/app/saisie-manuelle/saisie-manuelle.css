@@ -1,0 +1,50 @@
+/* Table styles with color coding */
+.vehicle-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.vehicle-table th {
+  background-color: #1e3a8a;
+  color: white;
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.vehicle-table td {
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.vehicle-table tr.total-row {
+  background-color: #d2b48c;
+  font-weight: 600;
+}
+
+/* Color-coded matricule rows */
+.row-color-1 { background-color: #86efac; }
+.row-color-1:hover { background-color: #6ee7b7; }
+
+.row-color-2 { background-color: #fcd34d; }
+.row-color-2:hover { background-color: #fbbf24; }
+
+.row-color-3 { background-color: #93c5fd; }
+.row-color-3:hover { background-color: #60a5fa; }
+
+.row-color-4 { background-color: #fdba74; }
+.row-color-4:hover { background-color: #fb923c; }
+
+.row-color-5 { background-color: #c4b5fd; }
+.row-color-5:hover { background-color: #a78bfa; }
+
+.row-color-6 { background-color: #a5b4fc; }
+.row-color-6:hover { background-color: #818cf8; }
+
+.row-color-7 { background-color: #a7f3d0; }
+.row-color-7:hover { background-color: #6ee7b7; }
+
+.row-color-8 { background-color: #fecaca; }
+.row-color-8:hover { background-color: #fca5a5; }

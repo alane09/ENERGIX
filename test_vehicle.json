@@ -1,0 +1,12 @@
+{
+  "type": "CAMION",
+  "matricule": "TEST-123",
+  "mois": "Janvier",
+  "year": "2024",
+  "region": "Tunis",
+  "consommationL": 400,
+  "kilometrage": 1000,
+  "produitsTonnes": 5,
+  "ipeL100km": 40,
+  "ipeL100TonneKm": 8
+}
