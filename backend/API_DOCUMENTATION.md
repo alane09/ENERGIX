@@ -10,11 +10,11 @@ All endpoints are prefixed with this base URL. The context path `/api` is config
 
 ## Authentication
 
-Currently, the API uses CORS with open access (`@CrossOrigin(origins = "*")`). For production, this should be restricted to specific origins.
+Currently, the API uses CORS with origins restricted to localhost development environments (`@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")`).
 
 ## Controllers Overview
 
-The API is organized into four main controllers:
+The API is organized into five main controllers:
 
 1. **VehicleController** - Handles vehicle records and statistics
    - Base path: `/records`
@@ -31,6 +31,10 @@ The API is organized into four main controllers:
 4. **ReportsController** - Handles report generation and management
    - Base path: `/reports`
    - Note: This controller does NOT include `/api` in its request mapping, so the full path becomes `/api/reports`
+
+5. **FileController** - Handles file operations for MongoDB GridFS storage
+   - Base path: `/files`
+   - Note: This controller does NOT include `/api` in its request mapping, so the full path becomes `/api/files`
 
 ## Detailed Endpoints
 
@@ -165,10 +169,12 @@ The API is organized into four main controllers:
 - **Request Parameters**:
   - `file`: Excel file (multipart form data)
   - `sheetName`: Name of the sheet to save data from
+  - `vehicleType`: Type of vehicle to categorize the data
   - `year`: Year for the data
   - `month` (optional): Month for the data, defaults to "all"
   - `replaceExisting` (optional): Whether to replace existing records, defaults to false
-- **Response**: Success status
+  - `region`: Region for the data
+- **Response**: Success status with record count
 
 #### Get Vehicle Types
 - **Endpoint**: `GET /api/vehicles`
@@ -210,6 +216,64 @@ The API is organized into four main controllers:
   - `id`: Report ID
 - **Response**: Report download URL or content
 
+### File Controller (`/api/files`)
+
+#### Upload File
+- **Endpoint**: `POST /api/files/upload`
+- **Description**: Upload a file to MongoDB storage
+- **Request Parameters**:
+  - `file`: File to upload (multipart form data)
+  - `vehicleType`: Type of vehicle to associate with the file (required)
+  - `year`: Year to associate with the file (required)
+- **Response**: File metadata with ID and available sheets
+
+#### Get File Upload History
+- **Endpoint**: `GET /api/files/history`
+- **Description**: Get file upload history
+- **Response**: List of file metadata DTOs
+
+#### Get File by ID
+- **Endpoint**: `GET /api/files/{id}`
+- **Description**: Get file metadata by ID
+- **Path Parameters**:
+  - `id`: File ID
+- **Response**: File metadata DTO
+
+#### Download File
+- **Endpoint**: `GET /api/files/{id}/download`
+- **Description**: Download a file by ID
+- **Path Parameters**:
+  - `id`: File ID
+- **Response**: File content
+
+#### Delete File
+- **Endpoint**: `DELETE /api/files/{id}/delete`
+- **Description**: Delete a file by ID
+- **Path Parameters**:
+  - `id`: File ID
+- **Response**: Success status
+
+#### Get Files by Vehicle Type
+- **Endpoint**: `GET /api/files/by-vehicle/{vehicleType}`
+- **Description**: Get files filtered by vehicle type
+- **Path Parameters**:
+  - `vehicleType`: Type of vehicle
+- **Response**: List of file metadata DTOs
+
+#### Get Files by Year
+- **Endpoint**: `GET /api/files/by-year/{year}`
+- **Description**: Get files filtered by year
+- **Path Parameters**:
+  - `year`: Year to filter by
+- **Response**: List of file metadata DTOs
+
+#### Get Files by Region
+- **Endpoint**: `GET /api/files/by-region/{region}`
+- **Description**: Get files filtered by region
+- **Path Parameters**:
+  - `region`: Region to filter by
+- **Response**: List of file metadata DTOs
+
 ## Data Models
 
 ### VehicleRecord
@@ -246,6 +310,44 @@ The API is organized into four main controllers:
 }
 ```
 
+### FileDocument
+```json
+{
+  "id": "string",
+  "name": "string",
+  "filename": "string",
+  "contentType": "string",
+  "size": "number",
+  "uploadDate": "date",
+  "year": "number",
+  "vehicleType": "string",
+  "region": "string",
+  "sheetName": "string",
+  "processed": "boolean",
+  "recordCount": "number",
+  "availableSheets": "array",
+  "active": "boolean"
+}
+```
+
+### FileDTO
+```json
+{
+  "id": "string",
+  "name": "string",
+  "contentType": "string",
+  "size": "number",
+  "uploadDate": "date",
+  "year": "number",
+  "vehicleType": "string",
+  "region": "string",
+  "sheetName": "string",
+  "processed": "boolean",
+  "recordCount": "number",
+  "availableSheets": "array"
+}
+```
+
 ## Error Handling
 
 All endpoints return appropriate HTTP status codes:
@@ -270,7 +372,8 @@ When integrating with the frontend, ensure that:
 1. The base URL is correctly set to `http://localhost:8080`
 2. The context path `/api` is properly handled in API requests
 3. For controllers that already include `/api` in their path (VehicleController), avoid duplicating the `/api` prefix
-4. For controllers that don't include `/api` in their path (RegressionController, UploadController), add the `/api` prefix
+4. For controllers that don't include `/api` in their path (RegressionController, UploadController, FileController), add the `/api` prefix
+5. CORS is configured to allow requests from `http://localhost:3000` and `http://localhost:3001` with credentials
 
 ## Example API Calls
 
@@ -284,20 +387,47 @@ fetch('http://localhost:8080/api/records/monthly-aggregation?type=Camion')
 ### Perform Regression Analysis
 ```javascript
 fetch('http://localhost:8080/api/regression/upload?type=Camion', {
-  method: 'POST'
+  method: 'POST',
+  credentials: 'include'
 })
   .then(response => response.json())
   .then(data => console.log(data));
 ```
 
-### Upload File
+### Upload Excel File for Data Extraction
 ```javascript
 const formData = new FormData();
 formData.append('file', fileObject);
 
 fetch('http://localhost:8080/api/upload', {
   method: 'POST',
-  body: formData
+  body: formData,
+  credentials: 'include'
+})
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+### Upload File to MongoDB Storage
+```javascript
+const formData = new FormData();
+formData.append('file', fileObject);
+formData.append('vehicleType', 'Camion');
+formData.append('year', '2025');
+
+fetch('http://localhost:8080/api/files/upload', {
+  method: 'POST',
+  body: formData,
+  credentials: 'include'
+})
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+### Get File Upload History
+```javascript
+fetch('http://localhost:8080/api/files/history', {
+  credentials: 'include'
 })
   .then(response => response.json())
   .then(data => console.log(data));

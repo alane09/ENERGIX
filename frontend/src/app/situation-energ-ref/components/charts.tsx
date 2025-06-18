@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { Card } from "@/components/ui/card";
@@ -113,20 +114,25 @@ export function ChartsTab({ data, rSquared, regressionEquation, vehicleType }: C
                     dot={false}
                     legendType="none"
                   />
-                  <Scatter 
-                    name="Tonnage transporté" 
-                    data={data.tonnageScatter.points} 
-                    fill="#22c55e"
-                  />
-                  <Line
-                    name="Linear (Tonnage transporté)"
-                    data={data.tonnageScatter.regressionLine}
-                    type="linear"
-                    dataKey="y"
-                    stroke="#22c55e"
-                    dot={false}
-                    legendType="none"
-                  />
+                  {/* Only show tonnage scatter and line for trucks */}
+                  {vehicleType === "CAMION" && (
+                    <>
+                      <Scatter 
+                        name="Tonnage transporté" 
+                        data={data.tonnageScatter.points} 
+                        fill="#22c55e"
+                      />
+                      <Line
+                        name="Linear (Tonnage transporté)"
+                        data={data.tonnageScatter.regressionLine}
+                        type="linear"
+                        dataKey="y"
+                        stroke="#22c55e"
+                        dot={false}
+                        legendType="none"
+                      />
+                    </>
+                  )}
                 </ScatterChart>
               </ResponsiveContainer>
               {regressionEquation && (

@@ -16,6 +16,7 @@ import com.carburant.backend.model.RegressionResult;
 import com.carburant.backend.model.VehicleRecord;
 import com.carburant.backend.repository.RegressionRepository;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -224,10 +225,12 @@ public class RegressionService {
         double significanceF = 1 - fDist.cumulativeProbability(fStat);
 
         String equation = String.format(
-            "Consommation = %.4f * kilométrage + %.2f",
-            coefficients[1], coefficients[0]
+            "Consommation = %.4f * kilométrage %s %.2f",
+            coefficients[1], 
+            coefficients[0] >= 0 ? "+" : "-",
+            Math.abs(coefficients[0])
         );
-
+ 
         RegressionCoefficients regressionCoefficients = RegressionCoefficients.builder()
             .kilometrage(coefficients[1])
             .tonnage(0.0)
@@ -336,8 +339,12 @@ public class RegressionService {
         double significanceF = 1 - fDist.cumulativeProbability(fStat);
 
         String equation = String.format(
-            "Consommation = %.4f * kilométrage + %.4f * tonnage + %.2f",
-            coefficients[1], coefficients[2], coefficients[0]
+            "Consommation = %.4f * kilométrage %s %.4f * tonnage %s %.2f",
+            coefficients[1],
+            coefficients[2] >= 0 ? "+" : "-",
+            Math.abs(coefficients[2]),
+            coefficients[0] >= 0 ? "+" : "-",
+            Math.abs(coefficients[0])
         );
 
         RegressionCoefficients regressionCoefficients = RegressionCoefficients.builder()
@@ -370,5 +377,38 @@ public class RegressionService {
             .residuals(residuals)
             .mse(errorMS)
             .build();
+    }
+
+    @PostConstruct
+    public void updateExistingEquations() {
+        List<RegressionResult> results = getAllRegressionResults();
+        for (RegressionResult result : results) {
+            RegressionCoefficients coef = result.getCoefficients();
+            String newEquation;
+            
+            if ("VOITURE".equals(result.getType())) {
+                newEquation = String.format(
+                    "Consommation = %.4f * kilométrage %s %.2f",
+                    coef.getKilometrage(),
+                    result.getIntercept() >= 0 ? "+" : "-",
+                    Math.abs(result.getIntercept())
+                );
+            } else {
+                newEquation = String.format(
+                    "Consommation = %.4f * kilométrage %s %.4f * tonnage %s %.2f",
+                    coef.getKilometrage(),
+                    coef.getTonnage() >= 0 ? "+" : "-",
+                    Math.abs(coef.getTonnage()),
+                    result.getIntercept() >= 0 ? "+" : "-",
+                    Math.abs(result.getIntercept())
+                );
+            }
+            
+            // Only update if equation format has changed
+            if (!newEquation.equals(result.getRegressionEquation())) {
+                result.setRegressionEquation(newEquation);
+                saveRegressionResult(result);
+            }
+        }
     }
 }

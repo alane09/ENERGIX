@@ -2,7 +2,6 @@
 
 import { NotificationsAPI } from "@/app/api/notifications";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
@@ -36,17 +35,19 @@ type SortConfig = {
 export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
-  // Removed addNotification usage because it's not available in notification context
 
   const regions = ["all", "Tunis", "Mjez el beb"];
 
-  // Calculate IPE values and get regression predictions
+  // Use the data as calculated in regression-client without overriding values
   const processedData = useMemo(() => {
     try {
       const dataWithIpe = data.map(item => ({
         ...item,
-        ipeL100km: (item.consommation / item.kilometrage) * 100,
-        ipeL100TonneKm: item.tonnage > 0 ? ((item.consommation / item.kilometrage) * 100) / item.tonnage : undefined
+        ipeL100km: item.ipe || (item.consommation / item.kilometrage) * 100,
+        ipeL100TonneKm: item.tonnage > 0 ? ((item.consommation / item.kilometrage) * 100) / item.tonnage : undefined,
+        // Calculate IPE_SER values using reference consumption
+        ipe_ser_L100km: (item.referenceConsommation / item.kilometrage) * 100,
+        ipe_ser_L100TonneKm: item.tonnage > 0 ? ((item.referenceConsommation / item.kilometrage) * 100) / item.tonnage : undefined
       }));
 
       // Get regression predictions for trucks
@@ -93,9 +94,11 @@ export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
       console.error('Error processing data:', error);
       return data.map(item => ({
         ...item,
-        ipeL100km: 0,
+        ipeL100km: item.ipe || 0,
         ipeL100TonneKm: undefined,
-        predictedIpeL100TonneKm: undefined
+        predictedIpeL100TonneKm: undefined,
+        ipe_ser_L100km: 0,
+        ipe_ser_L100TonneKm: undefined
       }));
     }
   }, [data]);
@@ -118,6 +121,11 @@ export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
   }, [processedData, selectedRegion, sortConfig]);
+
+  // Check if current filtered data has trucks
+  const hasTruckData = useMemo(() => {
+    return sortedData.some(item => item.vehicleType === "CAMION");
+  }, [sortedData]);
 
   const handleSort = (key: keyof MonthlyData) => {
     setSortConfig(current => ({
@@ -153,9 +161,9 @@ export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
         </Select>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
-        <ScrollArea className="h-[600px]">
-          <Table>
+      <div className="border rounded-lg">
+        <div className="overflow-auto max-h-[600px] w-full">
+          <Table className="min-w-[1200px]">
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow className="hover:bg-transparent">
                 <TableHead>
@@ -173,11 +181,14 @@ export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
                     Distance (km) <ArrowUpDown className="ml-1 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">
-                  <Button variant="ghost" onClick={() => handleSort('tonnage')} className="h-8 font-semibold">
-                    Tonnage <ArrowUpDown className="ml-1 h-4 w-4" />
-                  </Button>
-                </TableHead>
+                {/* Only show tonnage column for trucks */}
+                {hasTruckData && (
+                  <TableHead className="text-right">
+                    <Button variant="ghost" onClick={() => handleSort('tonnage')} className="h-8 font-semibold">
+                      Tonnage <ArrowUpDown className="ml-1 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                )}
                 <TableHead className="text-right">Consommation Actuelle (L)</TableHead>
                 <TableHead className="text-right">Consommation Référence (L)</TableHead>
                 <TableHead className="text-right">Consommation Cible (L)</TableHead>
@@ -187,10 +198,25 @@ export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
                   </Button>
                 </TableHead>
                 <TableHead className="text-right">
-                  <Button variant="ghost" onClick={() => handleSort('ipeL100TonneKm')} className="h-8 font-semibold">
-                    IPE (L/100km.Tonne) <ArrowUpDown className="ml-1 h-4 w-4" />
+                  <Button variant="ghost" onClick={() => handleSort('ipe_ser_L100km')} className="h-8 font-semibold">
+                    IPE_SER (L/100km) <ArrowUpDown className="ml-1 h-4 w-4" />
                   </Button>
                 </TableHead>
+                {/* Only show tonnage-related columns if any truck data exists */}
+                {hasTruckData && (
+                  <>
+                    <TableHead className="text-right">
+                      <Button variant="ghost" onClick={() => handleSort('ipeL100TonneKm')} className="h-8 font-semibold">
+                        IPE (L/100km.Tonne) <ArrowUpDown className="ml-1 h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <Button variant="ghost" onClick={() => handleSort('ipe_ser_L100TonneKm')} className="h-8 font-semibold">
+                        IPE_SER (L/100km.Tonne) <ArrowUpDown className="ml-1 h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                  </>
+                )}
                 <TableHead className="text-right">
                   <Button variant="ghost" onClick={() => handleSort('improvementPercentage')} className="h-8 font-semibold">
                     Amélioration (%) <ArrowUpDown className="ml-1 h-4 w-4" />
@@ -207,10 +233,13 @@ export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
                   <TableCell>{item.month}</TableCell>
                   <TableCell>{item.region}</TableCell>
                   <TableCell className="text-right font-mono">{item.kilometrage.toLocaleString('fr-FR')}</TableCell>
-                  <TableCell className="text-right font-mono">{item.tonnage.toLocaleString('fr-FR')}</TableCell>
-                  <TableCell className="text-right font-mono">{item.consommation.toLocaleString('fr-FR')}</TableCell>
-                  <TableCell className="text-right font-mono">{item.referenceConsommation.toLocaleString('fr-FR')}</TableCell>
-                  <TableCell className="text-right font-mono">{item.targetConsommation.toLocaleString('fr-FR')}</TableCell>
+                  {/* Only show tonnage cell for trucks */}
+                  {hasTruckData && (
+                    <TableCell className="text-right font-mono">{item.tonnage?.toLocaleString('fr-FR') || '-'}</TableCell>
+                  )}
+                  <TableCell className="text-right font-mono">{Number(item.consommation).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right font-mono">{Number(item.referenceConsommation).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right font-mono">{Number(item.targetConsommation).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                   <TableCell className={cn("text-right font-mono relative", getIpeColor(item))}>
                     <TooltipProvider>
                       <Tooltip>
@@ -222,7 +251,7 @@ export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Consommation pour 100 km parcourus</p>
+                          <p>IPE: Consommation actuelle pour 100 km parcourus</p>
                           {item.ipeL100km > 30 && (
                             <p className="text-red-500">Valeur anormalement élevée</p>
                           )}
@@ -230,33 +259,70 @@ export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
                       </Tooltip>
                     </TooltipProvider>
                   </TableCell>
-                  <TableCell className={cn("text-right font-mono relative", getIpeColor(item))}>
+                  <TableCell className="text-right font-mono">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="flex items-center justify-end gap-1">
-                            {item.ipeL100TonneKm?.toFixed(4) || '-'}
-                            {item.ipeL100TonneKm && item.predictedIpeL100TonneKm && 
-                             item.ipeL100TonneKm > item.predictedIpeL100TonneKm && (
-                              <AlertTriangle className="h-4 w-4 text-red-500" />
-                            )}
+                            {item.ipe_ser_L100km.toFixed(2)}
                             <Info className="h-4 w-4 text-muted-foreground" />
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Consommation pour 100 km parcourus par tonne transportée</p>
-                          {item.ipeL100TonneKm && item.predictedIpeL100TonneKm && (
-                            <>
-                              <p>Valeur prédite: {item.predictedIpeL100TonneKm.toFixed(4)}</p>
-                              {item.ipeL100TonneKm > item.predictedIpeL100TonneKm && (
-                                <p className="text-red-500">Supérieur à la valeur prédite</p>
-                              )}
-                            </>
-                          )}
+                          <p>IPE_SER: Consommation de référence pour 100 km parcourus</p>
+                          <p>Calculé avec la consommation de référence de la régression</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </TableCell>
+                  {/* Only show tonnage-related cells if any truck data exists */}
+                  {hasTruckData && (
+                    <>
+                      <TableCell className={cn("text-right font-mono relative", getIpeColor(item))}>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-end gap-1">
+                                {item.vehicleType === "CAMION" ? item.ipeL100TonneKm?.toFixed(4) : '-'}
+                                {item.vehicleType === "CAMION" && item.ipeL100TonneKm && item.predictedIpeL100TonneKm && 
+                                 item.ipeL100TonneKm > item.predictedIpeL100TonneKm && (
+                                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                                )}
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>IPE: Consommation actuelle pour 100 km parcourus par tonne transportée</p>
+                              {item.vehicleType === "CAMION" && item.ipeL100TonneKm && item.predictedIpeL100TonneKm && (
+                                <>
+                                  <p>Valeur prédite: {item.predictedIpeL100TonneKm.toFixed(4)}</p>
+                                  {item.ipeL100TonneKm > item.predictedIpeL100TonneKm && (
+                                    <p className="text-red-500">Supérieur à la valeur prédite</p>
+                                  )}
+                                </>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-end gap-1">
+                                {item.vehicleType === "CAMION" ? item.ipe_ser_L100TonneKm?.toFixed(4) : '-'}
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>IPE_SER: Consommation de référence pour 100 km parcourus par tonne transportée</p>
+                              <p>Calculé avec la consommation de référence de la régression</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell 
                     className={cn(
                       "text-right font-mono",
@@ -265,21 +331,35 @@ export function MonthlyDataTab({ data }: MonthlyDataTabProps) {
                         : 'text-green-500 dark:text-green-400'
                     )}
                   >
-                    {item.improvementPercentage.toFixed(2)}%
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center justify-end gap-1">
+                            {Number(item.improvementPercentage).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                            <Info className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>((Consommation actuelle – Consommation de référence) / Consommation actuelle) × 100</p>
+                          <p>Une valeur négative indique une amélioration par rapport à la référence</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </ScrollArea>
+        </div>
       </div>
 
       <div className="mt-4 space-y-1 text-sm text-muted-foreground">
-        <p>* IPE: Indice de Performance Énergétique</p>
-        <p>* IPE (L/100km): Consommation pour 100 km parcourus</p>
-        <p>* IPE (L/100km.Tonne): Consommation pour 100 km parcourus par tonne transportée</p>
+        <p>* IPE (L/100km): Indice de Performance Énergétique - consommation actuelle pour 100 km parcourus</p>
+        <p>* IPE_SER (L/100km): Indice de Performance Énergétique de Référence - consommation de référence pour 100 km parcourus</p>
+        <p>* IPE (L/100km.Tonne): Consommation actuelle pour 100 km parcourus par tonne transportée (camions uniquement)</p>
+        <p>* IPE_SER (L/100km.Tonne): Consommation de référence pour 100 km parcourus par tonne transportée (camions uniquement)</p>
         <p>* Amélioration: Une valeur négative indique une amélioration par rapport à la référence</p>
-        <p className="text-red-500 dark:text-red-400">* Rouge: IPE supérieur à 30 L/100km et IPE/Tonne supérieur à la valeur prédite</p>
+        <p className="text-red-500 dark:text-red-400">* Rouge: IPE supérieur à 30 L/100km ou IPE/Tonne supérieur à IPE_SER/Tonne</p>
         <p className="text-green-500 dark:text-green-400">* Vert: Valeurs dans la plage normale</p>
       </div>
     </div>

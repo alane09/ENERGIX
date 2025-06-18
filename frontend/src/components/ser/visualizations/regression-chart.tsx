@@ -5,16 +5,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useTheme } from "next-themes"
 import { memo, useMemo, useState } from "react"
 import {
-    CartesianGrid,
-    Legend,
-    ResponsiveContainer,
-    Scatter,
-    ScatterChart,
-    Tooltip,
-    TooltipProps,
-    XAxis,
-    YAxis,
-    ZAxis
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip,
+  TooltipProps,
+  XAxis,
+  YAxis,
+  ZAxis
 } from "recharts"
 import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent"
 
@@ -142,16 +142,13 @@ export function RegressionChart({ regressionData, monthlyData, coefficient }: Re
       intercept: regressionData.intercept || 0
     };
   }, [regressionData, coefficient]);
-
-  // Generate the regression line data points for kilometrage
+  // Generate the regression line data points for kilometrage using monthly aggregates
   const kilometrageRegressionData = useMemo(() => {
-    if (!monthlyData?.length) return [];
+    if (!validMonthlyData?.length) return [];
 
     try {
-      // Get all values for the kilometrage variable
-      const xValues = monthlyData
-        .filter(item => item.kilometrage !== undefined && item.kilometrage !== null && !isNaN(item.kilometrage))
-        .map(item => Number(item.kilometrage));
+      // Get all values for the kilometrage variable from monthly aggregates
+      const xValues = validMonthlyData.map(item => item.kilometrage);
       
       if (xValues.length === 0) return [];
       
@@ -295,10 +292,10 @@ export function RegressionChart({ regressionData, monthlyData, coefficient }: Re
     if (rSquared >= 0.5) return "Moyenne";
     return "Faible";
   };
-
-  // Filter out invalid data points for visualization
+  // Filter out invalid data points for visualization and convert to monthly aggregates
   const validMonthlyData = useMemo(() => {
-    return monthlyData.filter(item => 
+    // First filter out invalid data points
+    const validData = monthlyData.filter(item => 
       item.kilometrage !== undefined && 
       item.kilometrage !== null && 
       !isNaN(item.kilometrage) &&
@@ -309,6 +306,41 @@ export function RegressionChart({ regressionData, monthlyData, coefficient }: Re
       item.consommation !== null && 
       !isNaN(item.consommation)
     );
+
+    // Group by month and aggregate
+    const monthlyAggregates = new Map<string, {
+      month: string;
+      kilometrage: number;
+      tonnage: number;
+      consommation: number;
+      count: number;
+    }>();
+
+    validData.forEach(item => {
+      const month = item.month || 'Unknown';
+      if (!monthlyAggregates.has(month)) {
+        monthlyAggregates.set(month, {
+          month,
+          kilometrage: 0,
+          tonnage: 0,
+          consommation: 0,
+          count: 0
+        });
+      }
+      const aggregate = monthlyAggregates.get(month)!;
+      aggregate.kilometrage += item.kilometrage;
+      aggregate.tonnage += item.tonnage;
+      aggregate.consommation += item.consommation;
+      aggregate.count++;
+    });
+
+    // Calculate averages for each month
+    return Array.from(monthlyAggregates.values()).map(agg => ({
+      month: agg.month,
+      kilometrage: agg.kilometrage / agg.count,
+      tonnage: agg.tonnage / agg.count,
+      consommation: agg.consommation / agg.count
+    }));
   }, [monthlyData]);
 
   return (

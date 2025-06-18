@@ -8,11 +8,32 @@ export interface MonthlyData {
   referenceConsommation: number;
   targetConsommation: number;
   improvementPercentage: number;
+  ipe: number;
   ipeL100km: number;
   ipeL100TonneKm?: number;
   predictedIpeL100TonneKm?: number;
+  // New IPE_SER fields
+  ipe_ser_L100km: number;
+  ipe_ser_L100TonneKm?: number;
   matricule?: string;
   vehicleType?: string;
+}
+
+export interface VehicleData {
+  id: string; // Unique identifier from backend
+  month: string;
+  matricule: string;    // Vehicle ID
+  kilometrage: number;  // Distance traveled
+  consommation: number; // Actual consumption in L
+  tonnage: number;      // Only relevant for CAMION
+  ipeL100km: number;    // IPE (L/100km) 
+  ipeL100TonneKm: number | null; // IPE (L/100km.Tonne) - only for CAMION
+  referenceConsommation: number; // Reference consumption from regression equation
+  ipe_ser_L100km: number;        // IPE_SER (L/100km)
+  ipe_ser_L100TonneKm: number | null; // IPE_SER (L/100km.Tonne) - only for CAMION
+  vehicleType: "VOITURE" | "CAMION";
+  year: string;
+  region: string;
 }
 
 export interface ChartData {

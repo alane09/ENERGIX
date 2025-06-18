@@ -1,7 +1,11 @@
 "use client";
 
-import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertCircle, Download } from "lucide-react";
 import {
   CartesianGrid,
   Legend,
@@ -19,8 +23,16 @@ import { ValueType } from "recharts/types/component/DefaultTooltipContent";
 import { ChartData } from "../types";
 import { CustomTooltip } from "./ui/custom-tooltip";
 
+type Point = {
+  x: number;
+  y: number;
+};
+
 interface ChartsTabProps {
   data: ChartData | null;
+  isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 const CustomScatterTooltip = ({ 
@@ -53,13 +65,118 @@ const CustomLineTooltip = ({
   );
 };
 
-export function ChartsTab({ data }: ChartsTabProps) {
-  if (!data) return null;
+function calculateTicks(min: number, max: number, count: number): number[] {
+  if (min === max) {
+    return [min];
+  }
+  
+  // Round min and max to nearest thousand
+  min = Math.floor(min / 1000) * 1000;
+  max = Math.ceil(max / 1000) * 1000;
+  
+  const step = (max - min) / (count - 1);
+  const roundedStep = Math.ceil(step / 1000) * 1000; // Round step to nearest thousand
+  
+  const ticks = [];
+  for (let i = 0; i < count; i++) {
+    ticks.push(min + roundedStep * i);
+  }
+  
+  return ticks;
+}
+
+function formatAxisTick(value: number): string {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(0)}k`;
+  }
+  return value.toString();
+}
+
+export function ChartsTab({ data, isLoading, error, onRetry }: ChartsTabProps) {
+  const handleExport = () => {
+    // TODO: Implement export functionality
+    console.log("Export functionality to be implemented");
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-10 w-72" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <Skeleton className="h-[400px] w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription className="flex items-center justify-between">
+          <span>{error}</span>
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              Réessayer
+            </Button>
+          )}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Card>
+        <CardContent className="text-center p-8">
+          <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Aucune donnée disponible</h3>
+          <p className="text-muted-foreground">
+            Aucune donnée n'est disponible pour générer les graphiques
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Calculate dynamic domain and ticks for kilometrage
+  const kmValues = data.kilometrageScatter.points.map(p => p.x);
+  const minKm = Math.min(...kmValues);
+  const maxKm = Math.max(...kmValues);
+  const kmTicks = calculateTicks(minKm, maxKm, 7);
+
+  // Calculate dynamic domain and ticks for tonnage
+  const tonnageValues = data.tonnageScatter?.points.map(p => p.x) || [];
+  const minTonnage = Math.min(...tonnageValues);
+  const maxTonnage = Math.max(...tonnageValues);
+  const tonnageTicks = calculateTicks(minTonnage, maxTonnage, 7);
+
+  // Calculate dynamic domain and ticks for consumption (y-axis)
+  const consumptionValues = [
+    ...data.kilometrageScatter.points.map(p => p.y),
+    ...(data.tonnageScatter?.points.map(p => p.y) || [])
+  ];
+  const minConsumption = Math.min(...consumptionValues);
+  const maxConsumption = Math.max(...consumptionValues);
+  const consumptionTicks = calculateTicks(minConsumption, maxConsumption, 9);
 
   return (
     <div className="space-y-6">
-      <Card className="p-6">
-        <Tabs defaultValue="kilometrage">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Visualisation des données</CardTitle>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Exporter
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <Tabs defaultValue="kilometrage">
           <div className="flex items-center justify-between mb-6">
             <TabsList>
               <TabsTrigger value="kilometrage">Kilométrage</TabsTrigger>
@@ -95,12 +212,18 @@ export function ChartsTab({ data }: ChartsTabProps) {
                 <XAxis 
                   dataKey="x" 
                   name="Kilométrage"
-                  label={{ value: 'Kilométrage', position: 'bottom' }}
+                  domain={[minKm, maxKm]}
+                  ticks={kmTicks}
+                  tickFormatter={formatAxisTick}
+                  label={{ value: 'Kilométrage (km)', position: 'bottom', offset: -10 }}
                 />
                 <YAxis 
                   dataKey="y" 
                   name="Consommation"
-                  label={{ value: 'Consommation (L)', angle: -90, position: 'left' }}
+                  domain={[minConsumption, maxConsumption]}
+                  ticks={consumptionTicks}
+                  tickFormatter={formatAxisTick}
+                  label={{ value: 'Consommation (L)', angle: -90, position: 'insideLeft' }}
                 />
                 <RechartsTooltip 
                   cursor={{ strokeDasharray: '3 3' }}
@@ -128,12 +251,18 @@ export function ChartsTab({ data }: ChartsTabProps) {
                 <XAxis 
                   dataKey="x" 
                   name="Tonnage"
-                  label={{ value: 'Tonnage', position: 'bottom' }}
+                  domain={tonnageValues.length > 0 ? [minTonnage, maxTonnage] : undefined}
+                  ticks={tonnageValues.length > 0 ? tonnageTicks : undefined}
+                  tickFormatter={formatAxisTick}
+                  label={{ value: 'Tonnage (t)', position: 'bottom', offset: -10 }}
                 />
                 <YAxis 
                   dataKey="y" 
                   name="Consommation"
-                  label={{ value: 'Consommation (L)', angle: -90, position: 'left' }}
+                  domain={[minConsumption, maxConsumption]}
+                  ticks={consumptionTicks}
+                  tickFormatter={formatAxisTick}
+                  label={{ value: 'Consommation (L)', angle: -90, position: 'insideLeft' }}
                 />
                 <RechartsTooltip 
                   cursor={{ strokeDasharray: '3 3' }}
@@ -160,14 +289,17 @@ export function ChartsTab({ data }: ChartsTabProps) {
 
           <TabsContent value="monthly" className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.monthlyTrends} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+              <LineChart data={data.monthlyTrends} margin={{ top: 20, right: 30, bottom: 30, left: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="month"
                   label={{ value: 'Mois', position: 'bottom' }}
                 />
                 <YAxis 
-                  label={{ value: 'Consommation (L)', angle: -90, position: 'left' }}
+                  domain={[minConsumption, maxConsumption]}
+                  ticks={consumptionTicks}
+                  tickFormatter={formatAxisTick}
+                  label={{ value: 'Consommation (L)', angle: -90, position: 'insideLeft' }}
                 />
                 <RechartsTooltip content={CustomLineTooltip} />
                 <Legend />
@@ -195,7 +327,8 @@ export function ChartsTab({ data }: ChartsTabProps) {
               </LineChart>
             </ResponsiveContainer>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </CardContent>
       </Card>
     </div>
   );

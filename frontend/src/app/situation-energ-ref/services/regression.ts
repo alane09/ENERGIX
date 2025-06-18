@@ -255,7 +255,7 @@ export function performRegression(monthlyData: MonthlyData[], type: "VOITURE" | 
       predictedValues: simpleRegression.predictedValues,
       residuals: simpleRegression.residuals,
       mse: Math.pow(simpleRegression.standardError, 2),
-      regressionEquation: `Consommation = ${simpleRegression.slope.toFixed(4)} * kilométrage + ${simpleRegression.intercept.toFixed(2)}`
+      regressionEquation: `Consommation = ${simpleRegression.slope.toFixed(4)} * kilométrage ${simpleRegression.intercept >= 0 ? '+' : ''} ${simpleRegression.intercept.toFixed(2)}`
     };
   } else {
     const tonnage = monthlyData.map(d => d.tonnage);
@@ -286,7 +286,7 @@ export function performRegression(monthlyData: MonthlyData[], type: "VOITURE" | 
       predictedValues: multipleRegression.predictedValues,
       residuals: multipleRegression.residuals,
       mse: Math.pow(multipleRegression.standardError, 2),
-      regressionEquation: `Consommation = ${multipleRegression.coefficients[0].toFixed(4)} * kilométrage + ${multipleRegression.coefficients[1].toFixed(4)} * tonnage + ${multipleRegression.intercept.toFixed(2)}`
+      regressionEquation: `Consommation = ${multipleRegression.coefficients[0].toFixed(4)} * kilométrage ${multipleRegression.coefficients[1] >= 0 ? '+' : ''} ${multipleRegression.coefficients[1].toFixed(4)} * tonnage ${multipleRegression.intercept >= 0 ? '+' : ''} ${multipleRegression.intercept.toFixed(2)}`
     };
   }
 

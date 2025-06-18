@@ -13,7 +13,7 @@ import {
   ReferenceLine
 } from 'recharts';
 import { useTheme } from 'next-themes';
-import { MonthlyData, normalizeVehicleType } from '../../types/dashboard';
+import { MonthlyData } from '../../types/dashboard';
 
 interface LineChartProps {
   data: MonthlyData[];
@@ -113,7 +113,9 @@ export function LineChart({
   };
   
   // Custom tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({
+    active, payload, label
+  }: { active?: boolean; payload?: { dataKey: string; stroke: string; value: number }[]; label?: string | number }) => {
     if (active && payload && payload.length) {
       // If we're showing all vehicle types, we'll have multiple values in the payload
       const isMultipleVehicleTypes = selectedVehicleType === 'all' && payload.length > 1;
@@ -125,7 +127,7 @@ export function LineChart({
           {isMultipleVehicleTypes ? (
             // Show values for each vehicle type
             <div className="space-y-1 mt-1">
-              {payload.map((entry: any, index: number) => {
+              {payload.map((entry: {dataKey: string, stroke: string, value: number}, index: number) => {
                 // Extract vehicle type from dataKey (e.g., 'camions_consumption' -> 'camions')
                 const vehicleType = entry.dataKey.split('_')[0];
                 const vehicleLabel = vehicleType === 'camions' ? 'Camions' : 
